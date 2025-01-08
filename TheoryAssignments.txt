@@ -1,0 +1,34 @@
+Foreword on the practical part:
+I limited the time I will spend to about 90min.
+
+On the first feature I lost time on the test part on the generation of false data. The tests are written but do not pass because I did not have time to adapt the fake data accordingly.
+
+On the second feature I was blocked by a spec problem, on the top 100 each item has 3 sub items which are all at the rank corresponding to its index. by default I only took the first item of each rank. I also did not map correctly certain properties (ex store_id) because I do not know the right correspondence.
+
+
+Question 1:
+
+From a code point of view, we are missing typescript, more rules on eslint, actually plugging husky, a true package configuration (for developing and testing), tools to handle multiple environment. for testing using an h2 memory db to get more speed, move every configuration into environment files (ex: express port).
+
+Having a better file structure, because it was more convenient I put everything in the index.js and test.js but it's a bad practice. We should cut everything into single responsibility features and keep them in a src/ folder with an actual architecture. Consequences, we could split the init, from the express init, put all route to /api/game in it own folder, same for /api/game/search and /api/game/populate. I used an util to fetch json for feature2, it should have his own util folder, and file.
+For each routes, we should split controller/services/repositories parts; also having validation and authentication is necessary.
+For example '/api/games/populate' :
+
+We should have :
+=> populate.router.js containing the route, with only the necessary middlewares.
+=> populate.service.js containing the actual business value, making two calls to two different repositories
+=> top-rank.repositories.js containing call to the two endpoints, then map the results (that can be different from endpoints to endpoints), then wrap the response in something our Model can handle.
+=> game.repositories.js even if we are using db.Game it's still nice to keep handwritten queries in separate files to make everything easier to understand.
+
+This approach is verbose but is resilient through time.
+
+The project need tools to log, better error handling and be resilient to other endpoints (outside) being down.
+
+We should have more checks, eslint and husky are present, but we could have an auto eslint fix on commit. When going to the CI we need to run workers for tests and test coverage before doing any human reviews.
+
+
+Question 2
+
+First and easy approach is to setup a Cron.
+Another one is to giving the /api/game/populate link to the dataTeam; so they can update the db when they have new datas.
+Another way, if the need is huge should be to setup an evenemential approach. with a kafka for example. This way the dataTeam can push in only one flow and everyone can listen to it and synchronize.
