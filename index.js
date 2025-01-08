@@ -1,7 +1,30 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const https = require('https');
 const { Op } = require('sequelize');
 const db = require('./models');
+
+function fetchData(url) {
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (error) {
+            reject(new Error('Failed to parse JSON'));
+          }
+        });
+      })
+      .on('error', (err) => {
+        reject(err);
+      });
+  });
+}
 
 const app = express();
 
@@ -67,6 +90,29 @@ app.post('/api/games/search', (req, res) => {
     .catch((err) => {
       console.log('***There was an error searching games', JSON.stringify(err));
       return res.status(400).send(err);
+    });
+});
+
+app.post('/api/games/populate', async (req, res) => {
+  const urlToFetch = ['https://interview-marketing-eng-dev.s3.eu-west-1.amazonaws.com/android.top100.json',
+    'https://interview-marketing-eng-dev.s3.eu-west-1.amazonaws.com/ios.top100.json'];
+
+  const [result1, result2] = await Promise.all(urlToFetch.map((url) => fetchData(url)));
+  const mappedResult = [...result1, ...result2].map((el) => ({
+    publisherId: el[0].publisher_id,
+    name: el[0].name,
+    platform: el[0].os,
+    storeId: el[0].id,
+    bundleId: el[0].bundle_id,
+    appVersion: el[0].version,
+    isPublished: true,
+  }));
+
+  return db.Game.bulkCreate(mappedResult, { updateOnDuplicate: false })
+    .then(() => res.send('OK'))
+    .catch((err) => {
+      console.log('***There was an error retreiving games', JSON.stringify(err));
+      return res.status(400).send('KO');
     });
 });
 
